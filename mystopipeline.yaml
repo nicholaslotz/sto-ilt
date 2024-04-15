@@ -164,7 +164,7 @@ pipeline:
                   name: sqli
                   identifier: sqli
                   spec:
-                    connectorRef: mydockerconnector
+                    connectorRef: mycontainerregistryconnector
                     image: ${MY_CONTAINER_REGISTRY_LINK}/library/sqli:0.0.1
                     shell: Sh
                     command: wait-for postgres:5432 -- python run.py
