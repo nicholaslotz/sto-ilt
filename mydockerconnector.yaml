@@ -1,0 +1,15 @@
+connector:
+  name: mydockerconnector
+  identifier: mydockerconnector
+  description: ""
+  accountIdentifier: "${MY_HARNESS_ACCOUNT}"
+  orgIdentifier: "${MY_HARNESS_ORG}"
+  projectIdentifier: "${MY_HARNESS_PROJECT}"
+  type: DockerRegistry
+  spec:
+    dockerRegistryUrl: https://index.docker.io/v2/
+    providerType: DockerHub
+    auth:
+      type: Anonymous
+    executeOnDelegate: false
+    proxy: false
