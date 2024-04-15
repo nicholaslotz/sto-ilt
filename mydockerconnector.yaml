@@ -1,3 +1,4 @@
+# NOTE: Below YAML has the following environment vars from track setup: MY_HARNESS_ACCOUNT, MY_HARNESS_ORG, MY_HARNESS_PROJECT
 connector:
   name: mydockerconnector
   identifier: mydockerconnector
