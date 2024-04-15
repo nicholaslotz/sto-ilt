@@ -1,0 +1,189 @@
+# NOTE: Below YAML has the following environment vars from track setup: MY_HARNESS_PROJECT, MY_HARNESS_ORG, MY_CONTAINER_REGISTRY_LINK
+pipeline:
+  name: mystopipeline
+  identifier: mystopipeline
+  projectIdentifier: "${MY_HARNESS_PROJECT}"
+  orgIdentifier: "${MY_HARNESS_ORG}"
+  tags: {}
+  properties:
+    ci:
+      codebase:
+        repoName: my-web-app
+        build: <+input>
+  stages:
+    - stage:
+        name: Static Tests
+        identifier: Static_Tests
+        description: ""
+        type: SecurityTests
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      type: Bandit
+                      name: Bandit
+                      identifier: Bandit
+                      spec:
+                        mode: orchestration
+                        config: default
+                        target:
+                          type: repository
+                          detection: auto
+                        advanced:
+                          log:
+                            level: info
+                  - step:
+                      type: Owasp
+                      name: Owasp
+                      identifier: Owasp
+                      spec:
+                        mode: orchestration
+                        config: default
+                        target:
+                          type: repository
+                          detection: auto
+                        advanced:
+                          log:
+                            level: info
+                  - step:
+                      type: Run
+                      name: "Lint "
+                      identifier: Pylint
+                      spec:
+                        shell: Sh
+                        command: |-
+                          ls -l
+                          pip install ruff
+                          ruff check .
+                      failureStrategies:
+                        - onFailure:
+                            errors:
+                              - AllErrors
+                            action:
+                              type: Ignore
+    - parallel:
+        - stage:
+            name: Build App
+            identifier: Build_and_Test_App
+            description: ""
+            type: CI
+            spec:
+              cloneCodebase: true
+              caching:
+                enabled: false
+                paths: []
+              platform:
+                os: Linux
+                arch: Amd64
+              runtime:
+                type: Cloud
+                spec: {}
+              execution:
+                steps:
+                  - step:
+                      type: BuildAndPushDockerRegistry
+                      name: Build and Push App
+                      identifier: Build_and_Push_App
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        repo: ${MY_CONTAINER_REGISTRY_LINK}/library/sqli
+                        tags:
+                          - 0.0.1
+                        dockerfile: Dockerfile.app
+        - stage:
+            name: Build DB
+            identifier: Build_DB
+            description: ""
+            type: CI
+            spec:
+              cloneCodebase: true
+              platform:
+                os: Linux
+                arch: Amd64
+              runtime:
+                type: Cloud
+                spec: {}
+              execution:
+                steps:
+                  - step:
+                      type: BuildAndPushDockerRegistry
+                      name: Build and Push DB
+                      identifier: Build_and_Push_DB
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        repo: ${MY_CONTAINER_REGISTRY_LINK}/library/postgres
+                        tags:
+                          - 0.0.1
+                        dockerfile: Dockerfile.db
+    - stage:
+        name: Dynamic Tests
+        identifier: Dynamic_Tests
+        description: ""
+        type: SecurityTests
+        spec:
+          cloneCodebase: true
+          platform:
+            os: Linux
+            arch: Amd64
+          runtime:
+            type: Cloud
+            spec: {}
+          execution:
+            steps:
+              - parallel:
+                  - step:
+                      type: Background
+                      name: postgres
+                      identifier: postgres
+                      spec:
+                        connectorRef: mycontainerregistryconnector
+                        image: ${MY_CONTAINER_REGISTRY_LINK}/library/postgres:0.0.1
+                        shell: Sh
+                        portBindings:
+                          "5432": "5432"
+                  - step:
+                      type: Background
+                      name: redis
+                      identifier: redis
+                      spec:
+                        connectorRef: mydockerconnector
+                        image: docker.io/redis:alpine
+                        shell: Sh
+                        portBindings:
+                          "6379": "6379"
+              - step:
+                  type: Background
+                  name: sqli
+                  identifier: sqli
+                  spec:
+                    connectorRef: mydockerconnector
+                    image: ${MY_CONTAINER_REGISTRY_LINK}/library/sqli:0.0.1
+                    shell: Sh
+                    command: wait-for postgres:5432 -- python run.py
+                    portBindings:
+                      "8080": "8080"
+              - step:
+                  type: Zap
+                  name: Zap
+                  identifier: Zap
+                  spec:
+                    mode: orchestration
+                    config: default
+                    target:
+                      type: instance
+                      detection: auto
+                    advanced:
+                      log:
+                        level: info
+                    instance:
+                      domain: sqli
+                      protocol: http
+                      port: 8080
